@@ -1,8 +1,14 @@
 package com.example.demo.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
 import com.example.demo.model.SupplierProfile;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public interface SupplierProfileRepository
-        extends JpaRepository<SupplierProfile, Long> {
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SupplierProfileRepository extends JpaRepository<SupplierProfile, Long> {
+    Optional<SupplierProfile> findBySupplierCode(String supplierCode);
+    List<SupplierProfile> findByActiveTrue();
 }
