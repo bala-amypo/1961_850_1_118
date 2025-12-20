@@ -1,46 +1,51 @@
 package com.example.demo.service.impl;
 
-import org.springframework.stereotype.Service;
-import java.util.List;
-
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.model.SupplierProfile;
 import com.example.demo.repository.SupplierProfileRepository;
 import com.example.demo.service.SupplierProfileService;
-import com.example.demo.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class SupplierProfileServiceImpl implements SupplierProfileService {
 
-    private final SupplierProfileRepository repo;
+    private final SupplierProfileRepository supplierProfileRepository;
 
-    public SupplierProfileServiceImpl(SupplierProfileRepository repo) {
-        this.repo = repo;
+    public SupplierProfileServiceImpl(SupplierProfileRepository supplierProfileRepository) {
+        this.supplierProfileRepository = supplierProfileRepository;
     }
 
-    public SupplierProfile create(SupplierProfile supplier) {
-        return repo.save(supplier);
+    @Override
+    public SupplierProfile createSupplier(SupplierProfile supplier) {
+        if (supplierProfileRepository.findBySupplierCode(supplier.getSupplierCode()).isPresent()) {
+            throw new IllegalArgumentException("Supplier code already exists");
+        }
+        return supplierProfileRepository.save(supplier);
     }
 
-    public List<SupplierProfile> getAll() {
-        return repo.findAll();
+    @Override
+    public SupplierProfile getSupplierById(Long id) {
+        return supplierProfileRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found"));
     }
 
-    public SupplierProfile getById(Long id) {
-        return repo.findById(id)
-            .orElseThrow(() ->
-                new ResourceNotFoundException("Supplier not found with id " + id));
+    @Override
+    public Optional<SupplierProfile> getBySupplierCode(String supplierCode) {
+        return supplierProfileRepository.findBySupplierCode(supplierCode);
     }
 
-    public SupplierProfile update(Long id, SupplierProfile supplier) {
-        SupplierProfile existing = getById(id);
-        existing.supplierName = supplier.supplierName;
-        existing.email = supplier.email;
-        existing.phone = supplier.phone;
-        return repo.save(existing);
+    @Override
+    public List<SupplierProfile> getAllSuppliers() {
+        return supplierProfileRepository.findAll();
     }
 
-    public void delete(Long id) {
-        SupplierProfile supplier = getById(id);
-        repo.delete(supplier);
+    @Override
+    public SupplierProfile updateSupplierStatus(Long id, boolean active) {
+        SupplierProfile supplier = getSupplierById(id);
+        supplier.setActive(active);
+        return supplierProfileRepository.save(supplier);
     }
 }

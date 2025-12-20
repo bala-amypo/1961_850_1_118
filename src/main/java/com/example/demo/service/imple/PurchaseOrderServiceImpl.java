@@ -1,43 +1,56 @@
 package com.example.demo.service.impl;
 
-import org.springframework.stereotype.Service;
-import java.util.List;
-
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.model.PurchaseOrderRecord;
+import com.example.demo.model.SupplierProfile;
 import com.example.demo.repository.PurchaseOrderRecordRepository;
+import com.example.demo.repository.SupplierProfileRepository;
 import com.example.demo.service.PurchaseOrderService;
-import com.example.demo.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
-    private final PurchaseOrderRecordRepository repo;
+    private final PurchaseOrderRecordRepository poRepository;
+    private final SupplierProfileRepository supplierRepository;
 
-    public PurchaseOrderServiceImpl(PurchaseOrderRecordRepository repo) {
-        this.repo = repo;
+    public PurchaseOrderServiceImpl(PurchaseOrderRecordRepository poRepository, 
+                                   SupplierProfileRepository supplierRepository) {
+        this.poRepository = poRepository;
+        this.supplierRepository = supplierRepository;
     }
 
-    public PurchaseOrderRecord create(PurchaseOrderRecord po) {
-        return repo.save(po);
+    @Override
+    public PurchaseOrderRecord createPurchaseOrder(PurchaseOrderRecord po) {
+        SupplierProfile supplier = supplierRepository.findById(po.getSupplierId())
+                .orElseThrow(() -> new BadRequestException("Invalid supplierId"));
+        
+        if (!supplier.getActive()) {
+            throw new BadRequestException("must be active");
+        }
+        
+        if (po.getQuantity() <= 0) {
+            throw new BadRequestException("Quantity must be greater than 0");
+        }
+        
+        return poRepository.save(po);
     }
 
-    public List<PurchaseOrderRecord> getAll() {
-        return repo.findAll();
+    @Override
+    public List<PurchaseOrderRecord> getPOsBySupplier(Long supplierId) {
+        return poRepository.findBySupplierId(supplierId);
     }
 
-    public PurchaseOrderRecord getById(Long id) {
-        return repo.findById(id)
-            .orElseThrow(() ->
-                new ResourceNotFoundException("Purchase Order not found with id " + id));
+    @Override
+    public Optional<PurchaseOrderRecord> getPOById(Long id) {
+        return poRepository.findById(id);
     }
 
-    public PurchaseOrderRecord update(Long id, PurchaseOrderRecord po) {
-        PurchaseOrderRecord existing = getById(id);
-        existing.orderStatus = po.orderStatus;
-        return repo.save(existing);
-    }
-
-    public void delete(Long id) {
-        repo.delete(getById(id));
+    @Override
+    public List<PurchaseOrderRecord> getAllPurchaseOrders() {
+        return poRepository.findAll();
     }
 }

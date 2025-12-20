@@ -1,12 +1,14 @@
 package com.example.demo.service;
 
 import com.example.demo.model.SupplierProfile;
+
 import java.util.List;
+import java.util.Optional;
 
 public interface SupplierProfileService {
-    SupplierProfile create(SupplierProfile supplier);
-    List<SupplierProfile> getAll();
-    SupplierProfile getById(Long id);
-    SupplierProfile update(Long id, SupplierProfile supplier);
-    void delete(Long id);
+    SupplierProfile createSupplier(SupplierProfile supplier);
+    SupplierProfile getSupplierById(Long id);
+    Optional<SupplierProfile> getBySupplierCode(String supplierCode);
+    List<SupplierProfile> getAllSuppliers();
+    SupplierProfile updateSupplierStatus(Long id, boolean active);
 }
