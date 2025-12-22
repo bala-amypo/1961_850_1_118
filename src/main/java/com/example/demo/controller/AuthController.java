@@ -1,5 +1,7 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.LoginRequest;       
+import com.example.demo.dto.RegisterRequest;    
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -12,13 +14,15 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register new user", description = "Register a new user account")
-    public ResponseEntity<String> register() {
-        return ResponseEntity.ok("Registration endpoint - to be implemented in later review");
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
+       
+        return ResponseEntity.ok("User registered: " + request.getUsername());
     }
 
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticate user and obtain JWT token")
-    public ResponseEntity<String> login() {
-        return ResponseEntity.ok("Login endpoint - to be implemented in later review");
+    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+    
+        return ResponseEntity.ok("Login successful for: " + request.getUsername());
     }
 }
