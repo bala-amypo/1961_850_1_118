@@ -8,21 +8,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth")
-@Tag(name = "Authentication", description = "User authentication and registration")
-public class AuthController {
-
-    @PostMapping("/register")
-    @Operation(summary = "Register new user", description = "Register a new user account")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-       
-        return ResponseEntity.ok("User registered: " + request.getUsername());
+@PostMapping("/register")
+@Operation(summary = "Register new user")
+public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
+    // 1. Check if email exists (instead of username)
+    if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        return ResponseEntity.badRequest().body("Email already exists!");
     }
 
-    @PostMapping("/login")
-    @Operation(summary = "User login", description = "Authenticate user and obtain JWT token")
-    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+    // 2. Create User with new fields
+    AppUser newUser = new AppUser();
+    newUser.setEmail(request.getEmail());
+    newUser.setPassword(request.getPassword());
+    newUser.setRole(request.getRole()); // Crucial: Save the role
     
-        return ResponseEntity.ok("Login successful for: " + request.getUsername());
-    }
+    // 3. Save
+    userRepository.save(newUser);
+
+    return ResponseEntity.ok("User registered successfully!");
 }
