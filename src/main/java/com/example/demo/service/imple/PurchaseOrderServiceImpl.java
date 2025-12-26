@@ -40,7 +40,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    public List<PurchaseOrderRecord> getPOsBySupplier(Long supplierId) {
+    public List<PurchaseOrderRecord> getPOsBySupplierId(Long supplierId) {
         return poRepository.findBySupplierId(supplierId);
     }
 
