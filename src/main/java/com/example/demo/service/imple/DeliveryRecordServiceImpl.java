@@ -34,7 +34,6 @@ public class DeliveryRecordServiceImpl implements DeliveryRecordService {
         return deliveryRepository.save(delivery);
     }
 
-    @Override
     public List<DeliveryRecord> getDeliveriesByPoId(Long poId) {
         return deliveryRepository.findByPoId(poId);
     }
