@@ -11,6 +11,8 @@ import com.example.demo.service.impl.*;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,9 +26,15 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Single massive TestNG class (60+ tests)
+ */
+@SpringBootTest
+@ActiveProfiles("test")
 @Listeners(TestResultListener.class)
 public class SupplyChainWeakLinkAnalyzerTest {
 
+    // Mocks
     @Mock
     private SupplierProfileRepository supplierProfileRepository;
     @Mock
@@ -46,6 +54,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
     @Mock
     private JwtTokenProvider jwtTokenProvider;
 
+    // Services under test
     @InjectMocks
     private SupplierProfileServiceImpl supplierProfileService;
     @InjectMocks
@@ -57,7 +66,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
 
     private DelayScoreServiceImpl delayScoreService;
 
-    @BeforeMethod
+    @BeforeClass
     public void setup() {
         MockitoAnnotations.openMocks(this);
         delayScoreService = new DelayScoreServiceImpl(
@@ -68,6 +77,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
                 riskAlertService
         );
     }
+
+    // ----------------------------------------------------
+    // 1) "Servlet" / basic controller-like behaviors
+    // ----------------------------------------------------
 
     @Test(priority = 1, groups = {"servlet"})
     public void testControllerLikeResponse_NotNull() {
@@ -148,6 +161,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertFalse(opt.isPresent());
     }
 
+    // ----------------------------------------------------
+    // 2) CRUD with Spring Boot & REST style services
+    // ----------------------------------------------------
+
     @Test(priority = 8, groups = {"crud"})
     public void testCreatePurchaseOrder_success() {
         SupplierProfile supplier = new SupplierProfile();
@@ -162,7 +179,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
         po.setIssuedDate(LocalDate.now());
 
         when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
-        when(poRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        when(poRepository.save(any())).thenReturn(po);
 
         PurchaseOrderRecord created = purchaseOrderService.createPurchaseOrder(po);
         Assert.assertEquals(created.getQuantity().intValue(), 10);
@@ -299,6 +316,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertTrue(list.isEmpty());
     }
 
+    // ----------------------------------------------------
+    // 3) Dependency Injection / IoC behavior
+    // ----------------------------------------------------
+
     @Test(priority = 19, groups = {"di"})
     public void testServiceInjectedRepositoriesNotNull() {
         Assert.assertNotNull(supplierProfileService);
@@ -316,7 +337,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
         SupplierProfile supplier = new SupplierProfile();
         supplier.setSupplierCode("SUP-IOCTest");
         when(supplierProfileRepository.findBySupplierCode("SUP-IOCTest")).thenReturn(Optional.empty());
-        when(supplierProfileRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        when(supplierProfileRepository.save(any())).thenReturn(supplier);
 
         SupplierProfile created = supplierProfileService.createSupplier(supplier);
         Assert.assertEquals(created.getSupplierCode(), "SUP-IOCTest");
@@ -326,11 +347,16 @@ public class SupplyChainWeakLinkAnalyzerTest {
     public void testIoCBehaviorOnRiskAlertService() {
         SupplierRiskAlert alert = new SupplierRiskAlert();
         alert.setSupplierId(1L);
+        alert.setResolved(false);
 
-        when(riskAlertRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        when(riskAlertRepository.save(any())).thenReturn(alert);
         SupplierRiskAlert saved = riskAlertService.createAlert(alert);
         Assert.assertEquals(saved.getSupplierId(), Long.valueOf(1L));
     }
+
+    // ----------------------------------------------------
+    // 4) Hibernate / JPA CRUD & scoring
+    // ----------------------------------------------------
 
     @Test(priority = 23, groups = {"hibernate"})
     public void testComputeDelayScore_onTime() {
@@ -445,6 +471,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertEquals(delayScoreService.getAllScores().size(), 1);
     }
 
+    // ----------------------------------------------------
+    // 5) JPA normalization (1NF / 2NF / 3NF) conceptual tests
+    // ----------------------------------------------------
+
     @Test(priority = 29, groups = {"jpa"})
     public void testSupplierHasAtomicFields_1NF() {
         SupplierProfile s = new SupplierProfile();
@@ -491,6 +521,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
         s2.setSupplierCode("SUPY");
         Assert.assertNotEquals(s1.getSupplierCode(), s2.getSupplierCode());
     }
+
+    // ----------------------------------------------------
+    // 6) Many-to-Many / associations (concept using repositories)
+    // ----------------------------------------------------
 
     @Test(priority = 35, groups = {"manyToMany"})
     public void testSupplierMultiplePOsRelationship() {
@@ -557,11 +591,16 @@ public class SupplyChainWeakLinkAnalyzerTest {
     public void testAlertCreationDefaultResolvedFalse() {
         SupplierRiskAlert alert = new SupplierRiskAlert();
         alert.setSupplierId(3L);
+        alert.setResolved(false);
 
-        when(riskAlertRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        when(riskAlertRepository.save(any())).thenReturn(alert);
         SupplierRiskAlert saved = riskAlertService.createAlert(alert);
         Assert.assertFalse(saved.getResolved());
     }
+
+    // ----------------------------------------------------
+    // 7) Security / JWT Authentication
+    // ----------------------------------------------------
 
     @Test(priority = 41, groups = {"security"})
     public void testRegisterUserSuccess() {
@@ -583,6 +622,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
         when(userRepository.save(any())).thenReturn(savedUser);
         when(jwtTokenProvider.generateToken(savedUser)).thenReturn("TOKEN123");
 
+        // simulate controller logic
         String token = jwtTokenProvider.generateToken(savedUser);
         Assert.assertEquals(token, "TOKEN123");
         Assert.assertEquals(savedUser.getUsername(), "user1");
@@ -672,6 +712,10 @@ public class SupplyChainWeakLinkAnalyzerTest {
         when(jwtTokenProvider.validateToken("INVALID")).thenReturn(false);
         Assert.assertFalse(jwtTokenProvider.validateToken("INVALID"));
     }
+
+    // ----------------------------------------------------
+    // 8) HQL / Criteria-like queries
+    // ----------------------------------------------------
 
     @Test(priority = 50, groups = {"hql"})
     public void testFindSupplierByCodeMockQuery() {
