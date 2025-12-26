@@ -34,7 +34,7 @@ public class DelayScoreServiceImpl implements DelayScoreService {
             PurchaseOrderRecordRepository poRepository,
             DeliveryRecordRepository deliveryRepository,
             SupplierProfileRepository supplierRepository,
-            SupplierRiskAlertRepository  riskRepository;
+            SupplierRiskAlertRepository  riskRepository
     ) {
         this.delayScoreRepository = delayScoreRepository;
         this.poRepository = poRepository;
