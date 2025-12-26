@@ -11,6 +11,7 @@ import com.example.demo.repository.DeliveryRecordRepository;
 import com.example.demo.repository.PurchaseOrderRecordRepository;
 import com.example.demo.repository.SupplierProfileRepository;
 import com.example.demo.service.DelayScoreService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.temporal.ChronoUnit;
@@ -25,13 +26,12 @@ public class DelayScoreServiceImpl implements DelayScoreService {
     private final DeliveryRecordRepository deliveryRepository;
     private final SupplierProfileRepository supplierRepository;
 
-    // ✅ Constructor required by AmyPO hidden tests
+    @Autowired
     public DelayScoreServiceImpl(
             DelayScoreRecordRepository delayScoreRepository,
             PurchaseOrderRecordRepository poRepository,
             DeliveryRecordRepository deliveryRepository,
-            SupplierProfileRepository supplierRepository,
-            Object supplierRiskAlertService
+            SupplierProfileRepository supplierRepository
     ) {
         this.delayScoreRepository = delayScoreRepository;
         this.poRepository = poRepository;
@@ -39,17 +39,9 @@ public class DelayScoreServiceImpl implements DelayScoreService {
         this.supplierRepository = supplierRepository;
     }
 
-    public DelayScoreServiceImpl(
-            DelayScoreRecordRepository delayScoreRepository,
-            PurchaseOrderRecordRepository poRepository,
-            DeliveryRecordRepository deliveryRepository,
-            SupplierProfileRepository supplierRepository
-    ) {
-        this(delayScoreRepository, poRepository, deliveryRepository, supplierRepository, null);
-    }
-
     @Override
     public DelayScoreRecord computeDelayScore(Long poId) {
+
         PurchaseOrderRecord po = poRepository.findById(poId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found"));
 
@@ -62,7 +54,7 @@ public class DelayScoreServiceImpl implements DelayScoreService {
 
         List<DeliveryRecord> deliveries = deliveryRepository.findByPoId(poId);
         if (deliveries.isEmpty()) {
-            throw new BadRequestException("No deliveries");
+            throw new BadRequestException("No deliveries found for this PO");
         }
 
         DeliveryRecord delivery = deliveries.get(0);
@@ -89,8 +81,13 @@ public class DelayScoreServiceImpl implements DelayScoreService {
             score = 0.0;
         }
 
-        DelayScoreRecord delayScore =
-                new DelayScoreRecord(po.getSupplierId(), poId, delayDays, severity, score);
+        DelayScoreRecord delayScore = new DelayScoreRecord(
+                po.getSupplierId(),
+                poId,
+                delayDays,
+                severity,
+                score
+        );
 
         return delayScoreRepository.save(delayScore);
     }
