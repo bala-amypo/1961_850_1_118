@@ -13,7 +13,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
             throws ServletException, IOException {
-        // For first review, just pass through all requests
+    
         filterChain.doFilter(request, response);
     }
 }
