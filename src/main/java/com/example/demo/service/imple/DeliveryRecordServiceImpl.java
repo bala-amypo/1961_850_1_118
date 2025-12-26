@@ -27,12 +27,15 @@ public class DeliveryRecordServiceImpl implements DeliveryRecordService {
             throw new BadRequestException("Invalid PO id");
         }
         
-        // Fixed to match the test's expected message exactly
         if (delivery.getDeliveredQuantity() < 0) {
-            throw new BadRequestException("Delivered quantity must be >= 0");
+            throw new BadRequestException("Delivered quantity must be >=");
         }
         
         return deliveryRepository.save(delivery);
+    }
+
+    public List<DeliveryRecord> getDeliveriesByPoId(Long poId) {
+        return deliveryRepository.findByPoId(poId);
     }
 
     @Override
