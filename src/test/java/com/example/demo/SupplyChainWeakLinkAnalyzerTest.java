@@ -74,10 +74,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         );
     }
 
-    // ----------------------------------------------------
-    // 1) "Servlet" / basic controller-like behaviors
-    // ----------------------------------------------------
-
     @Test(priority = 1, groups = {"servlet"})
     public void testControllerLikeResponse_NotNull() {
         SupplierProfile supplier = new SupplierProfile();
@@ -155,10 +151,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Optional<SupplierProfile> opt = supplierProfileService.getBySupplierCode("UNKNOWN");
         Assert.assertFalse(opt.isPresent());
     }
-
-    // ----------------------------------------------------
-    // 2) CRUD with Spring Boot & REST style services
-    // ----------------------------------------------------
 
     @Test(priority = 8, groups = {"crud"})
     public void testCreatePurchaseOrder_success() {
@@ -311,9 +303,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertTrue(list.isEmpty());
     }
 
-    // ----------------------------------------------------
-    // 3) Dependency Injection / IoC behavior
-    // ----------------------------------------------------
+
 
     @Test(priority = 19, groups = {"di"})
     public void testServiceInjectedRepositoriesNotNull() {
@@ -347,9 +337,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertEquals(saved.getSupplierId(), Long.valueOf(1L));
     }
 
-    // ----------------------------------------------------
-    // 4) Hibernate / JPA CRUD & scoring
-    // ----------------------------------------------------
 
     @Test(priority = 23, groups = {"hibernate"})
     public void testComputeDelayScore_onTime() {
@@ -464,10 +451,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertEquals(delayScoreService.getAllScores().size(), 1);
     }
 
-    // ----------------------------------------------------
-    // 5) JPA normalization (1NF / 2NF / 3NF) conceptual tests
-    // ----------------------------------------------------
-
     @Test(priority = 29, groups = {"jpa"})
     public void testSupplierHasAtomicFields_1NF() {
         SupplierProfile s = new SupplierProfile();
@@ -515,9 +498,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertNotEquals(s1.getSupplierCode(), s2.getSupplierCode());
     }
 
-    // ----------------------------------------------------
-    // 6) Many-to-Many / associations (concept using repositories)
-    // ----------------------------------------------------
 
     @Test(priority = 35, groups = {"manyToMany"})
     public void testSupplierMultiplePOsRelationship() {
@@ -590,9 +570,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertFalse(saved.getResolved());
     }
 
-    // ----------------------------------------------------
-    // 7) Security / JWT Authentication
-    // ----------------------------------------------------
 
     @Test(priority = 41, groups = {"security"})
     public void testRegisterUserSuccess() {
@@ -614,7 +591,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         when(userRepository.save(any())).thenReturn(savedUser);
         when(jwtTokenProvider.generateToken(savedUser)).thenReturn("TOKEN123");
 
-        // simulate controller logic
         String token = jwtTokenProvider.generateToken(savedUser);
         Assert.assertEquals(token, "TOKEN123");
         Assert.assertEquals(savedUser.getUsername(), "user1");
@@ -704,10 +680,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         when(jwtTokenProvider.validateToken("INVALID")).thenReturn(false);
         Assert.assertFalse(jwtTokenProvider.validateToken("INVALID"));
     }
-
-    // ----------------------------------------------------
-    // 8) HQL / Criteria-like queries
-    // ----------------------------------------------------
 
     @Test(priority = 50, groups = {"hql"})
     public void testFindSupplierByCodeMockQuery() {
