@@ -24,13 +24,9 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Single massive TestNG class (60+ tests)
- */
 @Listeners(TestResultListener.class)
 public class SupplyChainWeakLinkAnalyzerTest {
 
-    // Mocks
     @Mock
     private SupplierProfileRepository supplierProfileRepository;
     @Mock
@@ -50,7 +46,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
     @Mock
     private JwtTokenProvider jwtTokenProvider;
 
-    // Services under test
     @InjectMocks
     private SupplierProfileServiceImpl supplierProfileService;
     @InjectMocks
@@ -62,7 +57,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
 
     private DelayScoreServiceImpl delayScoreService;
 
-    @BeforeClass
+    @BeforeMethod
     public void setup() {
         MockitoAnnotations.openMocks(this);
         delayScoreService = new DelayScoreServiceImpl(
@@ -102,6 +97,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
         supplier.setSupplierCode("SUP-01");
         supplier.setActive(true);
 
+        when(supplierProfileRepository.findBySupplierCode("SUP-01")).thenReturn(Optional.empty());
         when(supplierProfileRepository.save(any())).thenReturn(supplier);
         SupplierProfile created = supplierProfileService.createSupplier(supplier);
         Assert.assertEquals(created.getSupplierCode(), "SUP-01");
@@ -303,8 +299,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertTrue(list.isEmpty());
     }
 
-
-
     @Test(priority = 19, groups = {"di"})
     public void testServiceInjectedRepositoriesNotNull() {
         Assert.assertNotNull(supplierProfileService);
@@ -321,6 +315,7 @@ public class SupplyChainWeakLinkAnalyzerTest {
     public void testIoCBehaviorOnSupplierServiceCreate() {
         SupplierProfile supplier = new SupplierProfile();
         supplier.setSupplierCode("SUP-IOCTest");
+        when(supplierProfileRepository.findBySupplierCode("SUP-IOCTest")).thenReturn(Optional.empty());
         when(supplierProfileRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
 
         SupplierProfile created = supplierProfileService.createSupplier(supplier);
@@ -336,7 +331,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         SupplierRiskAlert saved = riskAlertService.createAlert(alert);
         Assert.assertEquals(saved.getSupplierId(), Long.valueOf(1L));
     }
-
 
     @Test(priority = 23, groups = {"hibernate"})
     public void testComputeDelayScore_onTime() {
@@ -498,7 +492,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         Assert.assertNotEquals(s1.getSupplierCode(), s2.getSupplierCode());
     }
 
-
     @Test(priority = 35, groups = {"manyToMany"})
     public void testSupplierMultiplePOsRelationship() {
         PurchaseOrderRecord po1 = new PurchaseOrderRecord();
@@ -569,7 +562,6 @@ public class SupplyChainWeakLinkAnalyzerTest {
         SupplierRiskAlert saved = riskAlertService.createAlert(alert);
         Assert.assertFalse(saved.getResolved());
     }
-
 
     @Test(priority = 41, groups = {"security"})
     public void testRegisterUserSuccess() {
