@@ -35,17 +35,6 @@ public class DelayScoreServiceImpl implements DelayScoreService {
         this.supplierRepository = supplierRepository;
     }
 
-    public DelayScoreServiceImpl(DelayScoreRecordRepository delayScoreRepository,
-                                PurchaseOrderRecordRepository poRepository,
-                                DeliveryRecordRepository deliveryRepository,
-                                SupplierProfileRepository supplierRepository,
-                                Object supplierRiskAlertService) {
-        this.delayScoreRepository = delayScoreRepository;
-        this.poRepository = poRepository;
-        this.deliveryRepository = deliveryRepository;
-        this.supplierRepository = supplierRepository;
-    }
-
     @Override
     public DelayScoreRecord computeDelayScore(Long poId) {
         PurchaseOrderRecord po = poRepository.findById(poId)
