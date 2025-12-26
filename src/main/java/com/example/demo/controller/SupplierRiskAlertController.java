@@ -49,4 +49,4 @@ public class SupplierRiskAlertController {
         List<SupplierRiskAlert> alerts = riskAlertService.getAllAlerts();
         return ResponseEntity.ok(alerts);
     }
-}
+}1
