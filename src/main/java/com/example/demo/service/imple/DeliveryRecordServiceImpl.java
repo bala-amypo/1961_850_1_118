@@ -34,21 +34,17 @@ public class DeliveryRecordServiceImpl implements DeliveryRecordService {
         return deliveryRepository.save(delivery);
     }
 
-    @Override
     public List<DeliveryRecord> getDeliveriesByPoId(Long poId) {
         return deliveryRepository.findByPoId(poId);
     }
 
-
+    @Override
+    public List<DeliveryRecord> getDeliveriesByPO(Long poId) {
+        return deliveryRepository.findByPoId(poId);
+    }
 
     @Override
     public List<DeliveryRecord> getAllDeliveries() {
         return deliveryRepository.findAll();
-    }
-
-    @Override
-    public List<DeliveryRecord> getDeliveriesByPO(Long poId) {
-    
-        throw new UnsupportedOperationException("Unimplemented method 'getDeliveriesByPO'");
     }
 }
