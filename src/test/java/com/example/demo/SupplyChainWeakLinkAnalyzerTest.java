@@ -14,6 +14,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.testng.AbstractTestNGSpringContextTests;
 import org.testng.Assert;
 import org.testng.annotations.*;
 
@@ -28,7 +29,7 @@ import static org.mockito.Mockito.*;
  * Single massive TestNG class (60+ tests)
  */
 @Listeners(TestResultListener.class)
-public class SupplyChainWeakLinkAnalyzerTest {
+public class SupplyChainWeakLinkAnalyzerTest extends AbstractTestNGSpringContextTests {
 
     // Mocks
     @Mock
