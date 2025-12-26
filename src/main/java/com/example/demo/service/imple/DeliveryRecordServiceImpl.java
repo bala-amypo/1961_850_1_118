@@ -23,7 +23,7 @@ public class DeliveryRecordServiceImpl implements DeliveryRecordService {
 
     @Override
     public DeliveryRecord recordDelivery(DeliveryRecord delivery) {
-        if (!poRepository.existsById(delivery.getPoId())) {
+        if (!poRepository.findById(delivery.getPoId()).isPresent()) {
             throw new BadRequestException("Invalid PO id");
         }
         

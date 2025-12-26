@@ -20,7 +20,8 @@ public class SupplierProfileServiceImpl implements SupplierProfileService {
 
     @Override
     public SupplierProfile createSupplier(SupplierProfile supplier) {
-        if (supplierProfileRepository.findBySupplierCode(supplier.getSupplierCode()).isPresent()) {
+        Optional<SupplierProfile> existing = supplierProfileRepository.findBySupplierCode(supplier.getSupplierCode());
+        if (existing.isPresent()) {
             throw new IllegalArgumentException("Supplier code already exists");
         }
         return supplierProfileRepository.save(supplier);
