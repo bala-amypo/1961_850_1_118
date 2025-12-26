@@ -1,433 +1,923 @@
 package com.example.demo;
 
 import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.RegisterRequest;
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.model.*;
 import com.example.demo.repository.*;
-import com.example.demo.service.impl.*;
+import com.example.demo.security.JwtTokenProvider;
 import com.example.demo.service.*;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import com.example.demo.service.impl.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.authentication.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.testng.AbstractTestNGSpringContextTests;
+import org.testng.Assert;
+import org.testng.annotations.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
-public class SupplyChainWeakLinkAnalyzerTest {
+/**
+ * Single massive TestNG class (60+ tests)
+ */
+@SuppressWarnings("unused")
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.properties")
+@Listeners(TestResultListener.class)
+public class SupplyChainWeakLinkAnalyzerTest extends AbstractTestNGSpringContextTests {
 
-    @Mock private SupplierProfileRepository supplierProfileRepository;
-    @Mock private PurchaseOrderRecordRepository purchaseOrderRepository;
-    @Mock private DeliveryRecordRepository deliveryRecordRepository;
-    @Mock private DelayScoreRecordRepository delayScoreRepository;
-    @Mock private SupplierRiskAlertRepository supplierRiskAlertRepository;
-    @Mock private AppUserRepository appUserRepository;
+    // Mocks
+    @MockBean
+    private SupplierProfileRepository supplierProfileRepository;
+    @MockBean
+    private PurchaseOrderRecordRepository poRepository;
+    @MockBean
+    private DeliveryRecordRepository deliveryRepository;
+    @MockBean
+    private DelayScoreRecordRepository delayScoreRecordRepository;
+    @MockBean
+    private SupplierRiskAlertRepository riskAlertRepository;
+    @MockBean
+    private AppUserRepository userRepository;
+    @MockBean
+    private AuthenticationManager authenticationManager;
+    @MockBean
+    private PasswordEncoder passwordEncoder;
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
 
-    @InjectMocks private SupplierProfileServiceImpl supplierProfileService;
-    @InjectMocks private PurchaseOrderServiceImpl purchaseOrderService;
-    @InjectMocks private DeliveryRecordServiceImpl deliveryRecordService;
-    @InjectMocks private DelayScoreServiceImpl delayScoreService;
-    @InjectMocks private SupplierRiskAlertServiceImpl supplierRiskAlertService;
+    // Services under test
+    @Autowired
+    private SupplierProfileService supplierProfileService;
+    @Autowired
+    private PurchaseOrderService purchaseOrderService;
+    @Autowired
+    private DeliveryRecordService deliveryRecordService;
+    @Autowired
+    private SupplierRiskAlertService riskAlertService;
+    @Autowired
+    private DelayScoreService delayScoreService;
 
-    private SupplierProfile testSupplier;
-    private PurchaseOrderRecord testPO;
-    private DeliveryRecord testDelivery;
-    private DelayScoreRecord testScore;
-    private SupplierRiskAlert testAlert;
-
-    @BeforeEach
-    public void setUp() {
-        testSupplier = new SupplierProfile("SUP001", "Test Supplier", "test@supplier.com", "1234567890", true);
-        testSupplier.setId(1L);
-        testSupplier.setCreatedAt(LocalDateTime.now());
-
-        testPO = new PurchaseOrderRecord("PO001", 1L, "Test Item", 100, LocalDate.now().plusDays(7), LocalDate.now());
-        testPO.setId(1L);
-
-        testDelivery = new DeliveryRecord(1L, LocalDate.now(), 100, "Test delivery");
-        testDelivery.setId(1L);
-
-        testScore = new DelayScoreRecord(1L, 1L, 0, "ON_TIME", 100.0);
-        testScore.setId(1L);
-
-        testAlert = new SupplierRiskAlert(1L, "HIGH", "Test alert");
-        testAlert.setId(1L);
+    @BeforeMethod
+    public void resetMocks() {
+        reset(supplierProfileRepository, poRepository, deliveryRepository, 
+              delayScoreRecordRepository, riskAlertRepository, userRepository,
+              authenticationManager, passwordEncoder, jwtTokenProvider);
     }
 
-    @Test
+    // ----------------------------------------------------
+    // 1) "Servlet" / basic controller-like behaviors
+    // ----------------------------------------------------
+
+    @Test(priority = 1, groups = {"servlet"})
     public void testControllerLikeResponse_NotNull() {
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setSupplierCode("SUP-01");
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+
         SupplierProfile result = supplierProfileService.getSupplierById(1L);
-        assertNotNull(result);
+        Assert.assertNotNull(result, "Supplier should not be null");
     }
 
-    @Test
+    @Test(priority = 2, groups = {"servlet"})
     public void testControllerLikeResponse_404() {
-        when(supplierProfileRepository.findById(999L)).thenReturn(Optional.empty());
-        assertThrows(Exception.class, () -> supplierProfileService.getSupplierById(999L));
-    }
-
-    @Test
-    public void testSimpleEndpointStyleLogic() {
-        when(supplierProfileRepository.save(any(SupplierProfile.class))).thenReturn(testSupplier);
-        when(supplierProfileRepository.findBySupplierCode(anyString())).thenReturn(Optional.empty());
-        SupplierProfile created = supplierProfileService.createSupplier(testSupplier);
-        assertNotNull(created);
-        assertNotNull(created.getSupplierCode());
-    }
-
-    @Test
-    public void testTomcatLikeMultipleRequestsSimulation() {
-        when(supplierProfileRepository.findById(anyLong())).thenReturn(Optional.of(testSupplier));
-        for (int i = 0; i < 5; i++) {
-            SupplierProfile result = supplierProfileService.getSupplierById(1L);
-            assertNotNull(result);
+        when(supplierProfileRepository.findById(99L)).thenReturn(Optional.empty());
+        try {
+            supplierProfileService.getSupplierById(99L);
+            Assert.fail("Expected ResourceNotFoundException");
+        } catch (Exception ex) {
+            Assert.assertTrue(ex.getMessage().contains("Supplier not found"), "Wrong exception message");
         }
     }
 
-    @Test
+    @Test(priority = 3, groups = {"servlet"})
+    public void testSimpleEndpointStyleLogic() {
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setSupplierCode("SUP-01");
+        supplier.setActive(true);
+
+        when(supplierProfileRepository.findBySupplierCode("SUP-01")).thenReturn(Optional.empty());
+        when(supplierProfileRepository.save(any())).thenReturn(supplier);
+        SupplierProfile created = supplierProfileService.createSupplier(supplier);
+        Assert.assertEquals(created.getSupplierCode(), "SUP-01");
+    }
+
+    @Test(priority = 4, groups = {"servlet"})
+    public void testTomcatLikeMultipleRequestsSimulation() {
+        List<SupplierProfile> list = new ArrayList<>();
+        SupplierProfile s1 = new SupplierProfile();
+        s1.setSupplierCode("SUP-01");
+        list.add(s1);
+        when(supplierProfileRepository.findAll()).thenReturn(list);
+
+        List<SupplierProfile> result = supplierProfileService.getAllSuppliers();
+        Assert.assertEquals(result.size(), 1);
+    }
+
+    @Test(priority = 5, groups = {"servlet"})
     public void testControllerToggleStatus() {
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        when(supplierProfileRepository.save(any(SupplierProfile.class))).thenReturn(testSupplier);
-        SupplierProfile result = supplierProfileService.updateSupplierStatus(1L, false);
-        assertNotNull(result);
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(10L);
+        supplier.setActive(true);
+
+        when(supplierProfileRepository.findById(10L)).thenReturn(Optional.of(supplier));
+        when(supplierProfileRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        SupplierProfile updated = supplierProfileService.updateSupplierStatus(10L, false);
+        Assert.assertFalse(updated.getActive());
     }
 
-    @Test
+    @Test(priority = 6, groups = {"servlet"})
     public void testLookupByCodePositive() {
-        when(supplierProfileRepository.findBySupplierCode("SUP001")).thenReturn(Optional.of(testSupplier));
-        Optional<SupplierProfile> result = supplierProfileService.getBySupplierCode("SUP001");
-        assertTrue(result.isPresent());
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setSupplierCode("SUP-TEST");
+        when(supplierProfileRepository.findBySupplierCode("SUP-TEST"))
+                .thenReturn(Optional.of(supplier));
+
+        Optional<SupplierProfile> opt = supplierProfileService.getBySupplierCode("SUP-TEST");
+        Assert.assertTrue(opt.isPresent());
     }
 
-    @Test
+    @Test(priority = 7, groups = {"servlet"})
     public void testLookupByCodeNegative() {
-        when(supplierProfileRepository.findBySupplierCode("INVALID")).thenReturn(Optional.empty());
-        Optional<SupplierProfile> result = supplierProfileService.getBySupplierCode("INVALID");
-        assertFalse(result.isPresent());
+        when(supplierProfileRepository.findBySupplierCode("UNKNOWN"))
+                .thenReturn(Optional.empty());
+
+        Optional<SupplierProfile> opt = supplierProfileService.getBySupplierCode("UNKNOWN");
+        Assert.assertFalse(opt.isPresent());
     }
 
-    @Test
+    // ----------------------------------------------------
+    // 2) CRUD with Spring Boot & REST style services
+    // ----------------------------------------------------
+
+    @Test(priority = 8, groups = {"crud"})
     public void testCreatePurchaseOrder_success() {
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        when(purchaseOrderRepository.save(any(PurchaseOrderRecord.class))).thenReturn(testPO);
-        PurchaseOrderRecord result = purchaseOrderService.createPurchaseOrder(testPO);
-        assertNotNull(result);
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(true);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setSupplierId(1L);
+        po.setQuantity(10);
+        po.setPoNumber("PO-1");
+        po.setPromisedDeliveryDate(LocalDate.now());
+        po.setIssuedDate(LocalDate.now());
+
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+        when(poRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        PurchaseOrderRecord created = purchaseOrderService.createPurchaseOrder(po);
+        Assert.assertEquals(created.getQuantity().intValue(), 10);
     }
 
-    @Test
+    @Test(priority = 9, groups = {"crud"})
     public void testCreatePurchaseOrder_invalidSupplier() {
-        when(supplierProfileRepository.findById(999L)).thenReturn(Optional.empty());
-        testPO.setSupplierId(999L);
-        assertThrows(Exception.class, () -> purchaseOrderService.createPurchaseOrder(testPO));
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setSupplierId(99L);
+        po.setQuantity(5);
+
+        when(supplierProfileRepository.findById(99L)).thenReturn(Optional.empty());
+
+        try {
+            purchaseOrderService.createPurchaseOrder(po);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Invalid supplierId"));
+        }
     }
 
-    @Test
+    @Test(priority = 10, groups = {"crud"})
     public void testCreatePurchaseOrder_inactiveSupplier() {
-        testSupplier.setActive(false);
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        assertThrows(Exception.class, () -> purchaseOrderService.createPurchaseOrder(testPO));
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(false);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setSupplierId(1L);
+        po.setQuantity(10);
+
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+
+        try {
+            purchaseOrderService.createPurchaseOrder(po);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("must be active"));
+        }
     }
 
-    @Test
+    @Test(priority = 11, groups = {"crud"})
     public void testGetPOsBySupplier_returnsList() {
-        when(purchaseOrderRepository.findBySupplierId(1L)).thenReturn(Arrays.asList(testPO));
-        List<PurchaseOrderRecord> result = purchaseOrderService.getPOsBySupplierId(1L);
-        assertFalse(result.isEmpty());
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setSupplierId(1L);
+        when(poRepository.findBySupplierId(1L)).thenReturn(List.of(po));
+
+        List<PurchaseOrderRecord> list = purchaseOrderService.getPOsBySupplier(1L);
+        Assert.assertEquals(list.size(), 1);
     }
 
-    @Test
+    @Test(priority = 12, groups = {"crud"})
     public void testGetPOById_positive() {
-        when(purchaseOrderRepository.findById(1L)).thenReturn(Optional.of(testPO));
-        Optional<PurchaseOrderRecord> result = purchaseOrderService.getPOById(1L);
-        assertTrue(result.isPresent());
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setId(10L);
+        when(poRepository.findById(10L)).thenReturn(Optional.of(po));
+
+        Optional<PurchaseOrderRecord> opt = purchaseOrderService.getPOById(10L);
+        Assert.assertTrue(opt.isPresent());
     }
 
-    @Test
+    @Test(priority = 13, groups = {"crud"})
     public void testGetPOById_negative() {
-        when(purchaseOrderRepository.findById(999L)).thenReturn(Optional.empty());
-        Optional<PurchaseOrderRecord> result = purchaseOrderService.getPOById(999L);
-        assertFalse(result.isPresent());
+        when(poRepository.findById(99L)).thenReturn(Optional.empty());
+        Optional<PurchaseOrderRecord> opt = purchaseOrderService.getPOById(99L);
+        Assert.assertFalse(opt.isPresent());
     }
 
-    @Test
+    @Test(priority = 14, groups = {"crud"})
     public void testRecordDelivery_success() {
-        when(purchaseOrderRepository.existsById(1L)).thenReturn(true);
-        when(deliveryRecordRepository.save(any(DeliveryRecord.class))).thenReturn(testDelivery);
-        DeliveryRecord result = deliveryRecordService.recordDelivery(testDelivery);
-        assertNotNull(result);
+        DeliveryRecord delivery = new DeliveryRecord();
+        delivery.setPoId(1L);
+        delivery.setDeliveredQuantity(5);
+
+        when(poRepository.existsById(1L)).thenReturn(true);
+        when(deliveryRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        DeliveryRecord saved = deliveryRecordService.recordDelivery(delivery);
+        Assert.assertEquals(saved.getDeliveredQuantity().intValue(), 5);
     }
 
-    @Test
+    @Test(priority = 15, groups = {"crud"})
     public void testRecordDelivery_invalidPo() {
-        when(purchaseOrderRepository.existsById(999L)).thenReturn(false);
-        testDelivery.setPoId(999L);
-        assertThrows(Exception.class, () -> deliveryRecordService.recordDelivery(testDelivery));
+        DeliveryRecord delivery = new DeliveryRecord();
+        delivery.setPoId(999L);
+        delivery.setDeliveredQuantity(5);
+
+        when(poRepository.existsById(999L)).thenReturn(false);
+
+        try {
+            deliveryRecordService.recordDelivery(delivery);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Invalid PO id"));
+        }
     }
 
-    @Test
+    @Test(priority = 16, groups = {"crud"})
     public void testRecordDelivery_negativeQuantity() {
-        testDelivery.setQuantityDelivered(-10);
-        assertThrows(Exception.class, () -> deliveryRecordService.recordDelivery(testDelivery));
+        DeliveryRecord delivery = new DeliveryRecord();
+        delivery.setPoId(1L);
+        delivery.setDeliveredQuantity(-1);
+
+        when(poRepository.existsById(1L)).thenReturn(true);
+
+        try {
+            deliveryRecordService.recordDelivery(delivery);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Delivered quantity must be >="));
+        }
     }
 
-    @Test
+    @Test(priority = 17, groups = {"crud"})
     public void testGetDeliveriesByPo_returnsList() {
-        when(deliveryRecordRepository.findByPoId(1L)).thenReturn(Arrays.asList(testDelivery));
-        List<DeliveryRecord> result = deliveryRecordService.getDeliveriesByPoId(1L);
-        assertFalse(result.isEmpty());
+        DeliveryRecord d = new DeliveryRecord();
+        d.setPoId(1L);
+        when(deliveryRepository.findByPoId(1L)).thenReturn(List.of(d));
+
+        List<DeliveryRecord> list = deliveryRecordService.getDeliveriesByPO(1L);
+        Assert.assertEquals(list.size(), 1);
     }
 
-    @Test
+    @Test(priority = 18, groups = {"crud"})
     public void testGetAllDeliveries_emptyList() {
-        when(deliveryRecordRepository.findAll()).thenReturn(new ArrayList<>());
-        List<DeliveryRecord> result = deliveryRecordService.getAllDeliveries();
-        assertTrue(result.isEmpty());
+        when(deliveryRepository.findAll()).thenReturn(Collections.emptyList());
+        List<DeliveryRecord> list = deliveryRecordService.getAllDeliveries();
+        Assert.assertTrue(list.isEmpty());
     }
 
-    @Test
+    // ----------------------------------------------------
+    // 3) Dependency Injection / IoC behavior
+    // ----------------------------------------------------
+
+    @Test(priority = 19, groups = {"di"})
     public void testServiceInjectedRepositoriesNotNull() {
-        assertNotNull(supplierProfileService);
-        assertNotNull(purchaseOrderService);
-        assertNotNull(deliveryRecordService);
-        assertNotNull(delayScoreService);
+        Assert.assertNotNull(supplierProfileService);
+        Assert.assertNotNull(purchaseOrderService);
+        Assert.assertNotNull(deliveryRecordService);
     }
 
-    @Test
+    @Test(priority = 20, groups = {"di"})
     public void testDelayScoreServiceHasDependencies() {
-        assertNotNull(delayScoreService);
+        Assert.assertNotNull(delayScoreService);
     }
 
-    @Test
+    @Test(priority = 21, groups = {"di"})
     public void testIoCBehaviorOnSupplierServiceCreate() {
-        when(supplierProfileRepository.save(any(SupplierProfile.class))).thenReturn(testSupplier);
-        when(supplierProfileRepository.findBySupplierCode(anyString())).thenReturn(Optional.empty());
-        SupplierProfile created = supplierProfileService.createSupplier(testSupplier);
-        assertNotNull(created);
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setSupplierCode("SUP-IOCTest");
+        when(supplierProfileRepository.findBySupplierCode("SUP-IOCTest")).thenReturn(Optional.empty());
+        when(supplierProfileRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        SupplierProfile created = supplierProfileService.createSupplier(supplier);
+        Assert.assertEquals(created.getSupplierCode(), "SUP-IOCTest");
     }
 
-    @Test
+    @Test(priority = 22, groups = {"di"})
     public void testIoCBehaviorOnRiskAlertService() {
-        when(supplierRiskAlertRepository.save(any(SupplierRiskAlert.class))).thenReturn(testAlert);
-        SupplierRiskAlert created = supplierRiskAlertService.createAlert(testAlert);
-        assertNotNull(created);
+        SupplierRiskAlert alert = new SupplierRiskAlert();
+        alert.setSupplierId(1L);
+
+        when(riskAlertRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        SupplierRiskAlert saved = riskAlertService.createAlert(alert);
+        Assert.assertEquals(saved.getSupplierId(), Long.valueOf(1L));
     }
 
-    @Test
+    // ----------------------------------------------------
+    // 4) Hibernate / JPA CRUD & scoring
+    // ----------------------------------------------------
+
+    @Test(priority = 23, groups = {"hibernate"})
     public void testComputeDelayScore_onTime() {
-        when(purchaseOrderRepository.findById(1L)).thenReturn(Optional.of(testPO));
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        when(deliveryRecordRepository.findByPoId(1L)).thenReturn(Arrays.asList(testDelivery));
-        when(delayScoreRepository.save(any(DelayScoreRecord.class))).thenReturn(testScore);
-        DelayScoreRecord result = delayScoreService.computeDelayScore(1L);
-        assertNotNull(result);
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(true);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setId(100L);
+        po.setSupplierId(1L);
+        po.setPromisedDeliveryDate(LocalDate.now());
+
+        DeliveryRecord delivery = new DeliveryRecord();
+        delivery.setPoId(100L);
+        delivery.setActualDeliveryDate(LocalDate.now());
+
+        when(poRepository.findById(100L)).thenReturn(Optional.of(po));
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+        when(deliveryRepository.findByPoId(100L)).thenReturn(List.of(delivery));
+        when(delayScoreRecordRepository.findByPoId(100L)).thenReturn(Optional.empty());
+        when(delayScoreRecordRepository.findBySupplierId(1L)).thenReturn(Collections.emptyList());
+        when(delayScoreRecordRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        DelayScoreRecord record = delayScoreService.computeDelayScore(100L);
+        Assert.assertEquals(record.getDelayDays().intValue(), 0);
+        Assert.assertEquals(record.getDelaySeverity(), "ON_TIME");
     }
 
-    @Test
+    @Test(priority = 24, groups = {"hibernate"})
     public void testComputeDelayScore_minorDelay() {
-        testDelivery.setActualDeliveryDate(LocalDate.now().plusDays(2));
-        when(purchaseOrderRepository.findById(1L)).thenReturn(Optional.of(testPO));
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        when(deliveryRecordRepository.findByPoId(1L)).thenReturn(Arrays.asList(testDelivery));
-        when(delayScoreRepository.save(any(DelayScoreRecord.class))).thenReturn(testScore);
-        DelayScoreRecord result = delayScoreService.computeDelayScore(1L);
-        assertNotNull(result);
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(true);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setId(101L);
+        po.setSupplierId(1L);
+        po.setPromisedDeliveryDate(LocalDate.now().minusDays(2));
+
+        DeliveryRecord delivery = new DeliveryRecord();
+        delivery.setPoId(101L);
+        delivery.setActualDeliveryDate(LocalDate.now());
+
+        when(poRepository.findById(101L)).thenReturn(Optional.of(po));
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+        when(deliveryRepository.findByPoId(101L)).thenReturn(List.of(delivery));
+        when(delayScoreRecordRepository.findByPoId(101L)).thenReturn(Optional.empty());
+        when(delayScoreRecordRepository.findBySupplierId(1L)).thenReturn(Collections.emptyList());
+        when(delayScoreRecordRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        DelayScoreRecord record = delayScoreService.computeDelayScore(101L);
+        Assert.assertEquals(record.getDelaySeverity(), "MINOR");
+        Assert.assertTrue(record.getScore() < 100.0);
     }
 
-    @Test
+    @Test(priority = 25, groups = {"hibernate"})
     public void testComputeDelayScore_noDeliveries() {
-        when(purchaseOrderRepository.findById(1L)).thenReturn(Optional.of(testPO));
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        when(deliveryRecordRepository.findByPoId(1L)).thenReturn(new ArrayList<>());
-        assertThrows(Exception.class, () -> delayScoreService.computeDelayScore(1L));
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(true);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setId(102L);
+        po.setSupplierId(1L);
+        po.setPromisedDeliveryDate(LocalDate.now());
+
+        when(poRepository.findById(102L)).thenReturn(Optional.of(po));
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+        when(deliveryRepository.findByPoId(102L)).thenReturn(Collections.emptyList());
+
+        try {
+            delayScoreService.computeDelayScore(102L);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("No deliveries"));
+        }
     }
 
-    @Test
+    @Test(priority = 26, groups = {"hibernate"})
     public void testComputeDelayScore_inactiveSupplier() {
-        testSupplier.setActive(false);
-        when(purchaseOrderRepository.findById(1L)).thenReturn(Optional.of(testPO));
-        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(testSupplier));
-        assertThrows(Exception.class, () -> delayScoreService.computeDelayScore(1L));
+        SupplierProfile supplier = new SupplierProfile();
+        supplier.setId(1L);
+        supplier.setActive(false);
+
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setId(103L);
+        po.setSupplierId(1L);
+        po.setPromisedDeliveryDate(LocalDate.now());
+
+        when(poRepository.findById(103L)).thenReturn(Optional.of(po));
+        when(supplierProfileRepository.findById(1L)).thenReturn(Optional.of(supplier));
+
+        try {
+            delayScoreService.computeDelayScore(103L);
+            Assert.fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Inactive supplier"));
+        }
     }
 
-    @Test
+    @Test(priority = 27, groups = {"hibernate"})
     public void testGetScoresBySupplier_empty() {
-        when(delayScoreRepository.findBySupplierId(1L)).thenReturn(new ArrayList<>());
-        List<DelayScoreRecord> result = delayScoreService.getScoresBySupplier(1L);
-        assertTrue(result.isEmpty());
+        when(delayScoreRecordRepository.findBySupplierId(1L)).thenReturn(Collections.emptyList());
+        Assert.assertTrue(delayScoreService.getScoresBySupplier(1L).isEmpty());
     }
 
-    @Test
+    @Test(priority = 28, groups = {"hibernate"})
     public void testGetAllScores_nonEmpty() {
-        when(delayScoreRepository.findAll()).thenReturn(Arrays.asList(testScore));
-        List<DelayScoreRecord> result = delayScoreService.getAllScores();
-        assertFalse(result.isEmpty());
+        DelayScoreRecord s = new DelayScoreRecord();
+        s.setSupplierId(1L);
+        when(delayScoreRecordRepository.findAll()).thenReturn(List.of(s));
+        Assert.assertEquals(delayScoreService.getAllScores().size(), 1);
     }
 
-    // Database/Model tests
-    @Test 
-    public void testSupplierHasAtomicFields_1NF() { 
-        assertNotNull(testSupplier.getSupplierCode());
-        assertNotNull(testSupplier.getSupplierName());
+    // ----------------------------------------------------
+    // 5) JPA normalization (1NF / 2NF / 3NF) conceptual tests
+    // ----------------------------------------------------
+
+    @Test(priority = 29, groups = {"jpa"})
+    public void testSupplierHasAtomicFields_1NF() {
+        SupplierProfile s = new SupplierProfile();
+        s.setSupplierName("ACME");
+        s.setEmail("acme@test.com");
+        Assert.assertTrue(s.getSupplierName().contains("ACME"));
     }
-    
-    @Test 
-    public void testPurchaseOrderReferentialIntegrity() { 
-        assertNotNull(testPO.getSupplierId());
+
+    @Test(priority = 30, groups = {"jpa"})
+    public void testPurchaseOrderReferentialIntegrity() {
+        PurchaseOrderRecord po = new PurchaseOrderRecord();
+        po.setSupplierId(1L);
+        Assert.assertNotNull(po.getSupplierId());
     }
-    
-    @Test 
-    public void testDelayScoreOnePerPoUniqueConstraintConcept() { 
-        assertNotNull(testScore.getPoId());
+
+    @Test(priority = 31, groups = {"jpa"})
+    public void testDelayScoreOnePerPoUniqueConstraintConcept() {
+        DelayScoreRecord score = new DelayScoreRecord();
+        score.setPoId(1L);
+        score.setSupplierId(1L);
+        score.setDelayDays(2);
+        Assert.assertEquals(score.getPoId(), Long.valueOf(1L));
     }
-    
-    @Test 
-    public void testRiskAlertReferencesSupplier_3NF() { 
-        assertNotNull(testAlert.getSupplierId());
+
+    @Test(priority = 32, groups = {"jpa"})
+    public void testRiskAlertReferencesSupplier_3NF() {
+        SupplierRiskAlert alert = new SupplierRiskAlert();
+        alert.setSupplierId(2L);
+        Assert.assertEquals(alert.getSupplierId(), Long.valueOf(2L));
     }
-    
-    @Test 
-    public void testDeliveryRecordUsesPoIdAsFk() { 
-        assertNotNull(testDelivery.getPoId());
+
+    @Test(priority = 33, groups = {"jpa"})
+    public void testDeliveryRecordUsesPoIdAsFk() {
+        DeliveryRecord d = new DeliveryRecord();
+        d.setPoId(5L);
+        Assert.assertNotNull(d.getPoId());
     }
-    
-    @Test 
-    public void testSupplierUniqueCodeConstraintConcept() { 
-        assertNotNull(testSupplier.getSupplierCode());
+
+    @Test(priority = 34, groups = {"jpa"})
+    public void testSupplierUniqueCodeConstraintConcept() {
+        SupplierProfile s1 = new SupplierProfile();
+        SupplierProfile s2 = new SupplierProfile();
+        s1.setSupplierCode("SUPX");
+        s2.setSupplierCode("SUPY");
+        Assert.assertNotEquals(s1.getSupplierCode(), s2.getSupplierCode());
     }
-    
-    @Test
+
+    // ----------------------------------------------------
+    // 6) Many-to-Many / associations (concept using repositories)
+    // ----------------------------------------------------
+
+    @Test(priority = 35, groups = {"manyToMany"})
     public void testSupplierMultiplePOsRelationship() {
-        when(purchaseOrderRepository.findBySupplierId(1L)).thenReturn(Arrays.asList(testPO));
-        List<PurchaseOrderRecord> pos = purchaseOrderService.getPOsBySupplierId(1L);
-        assertFalse(pos.isEmpty());
+        PurchaseOrderRecord po1 = new PurchaseOrderRecord();
+        po1.setSupplierId(1L);
+        PurchaseOrderRecord po2 = new PurchaseOrderRecord();
+        po2.setSupplierId(1L);
+
+        when(poRepository.findBySupplierId(1L)).thenReturn(List.of(po1, po2));
+        List<PurchaseOrderRecord> list = purchaseOrderService.getPOsBySupplier(1L);
+        Assert.assertEquals(list.size(), 2);
     }
-    
-    @Test
+
+    @Test(priority = 36, groups = {"manyToMany"})
     public void testPoHasMultipleDeliveries() {
-        when(deliveryRecordRepository.findByPoId(1L)).thenReturn(Arrays.asList(testDelivery));
-        List<DeliveryRecord> deliveries = deliveryRecordService.getDeliveriesByPoId(1L);
-        assertFalse(deliveries.isEmpty());
+        DeliveryRecord d1 = new DeliveryRecord();
+        d1.setPoId(1L);
+        DeliveryRecord d2 = new DeliveryRecord();
+        d2.setPoId(1L);
+        when(deliveryRepository.findByPoId(1L)).thenReturn(List.of(d1, d2));
+
+        List<DeliveryRecord> list = deliveryRecordService.getDeliveriesByPO(1L);
+        Assert.assertEquals(list.size(), 2);
     }
-    
-    @Test 
-    public void testSupplierMultipleScoresSimulateManyToMany() { 
-        when(delayScoreRepository.findBySupplierId(1L)).thenReturn(Arrays.asList(testScore));
+
+    @Test(priority = 37, groups = {"manyToMany"})
+    public void testSupplierMultipleScoresSimulateManyToMany() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setSupplierId(1L);
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setSupplierId(1L);
+
+        when(delayScoreRecordRepository.findBySupplierId(1L)).thenReturn(List.of(s1, s2));
         List<DelayScoreRecord> scores = delayScoreService.getScoresBySupplier(1L);
-        assertFalse(scores.isEmpty());
+        Assert.assertEquals(scores.size(), 2);
     }
-    
-    @Test
+
+    @Test(priority = 38, groups = {"manyToMany"})
     public void testSupplierMultipleAlerts() {
-        when(supplierRiskAlertRepository.findBySupplierId(1L)).thenReturn(Arrays.asList(testAlert));
-        List<SupplierRiskAlert> alerts = supplierRiskAlertService.getAlertsBySupplier(1L);
-        assertFalse(alerts.isEmpty());
+        SupplierRiskAlert a1 = new SupplierRiskAlert();
+        a1.setSupplierId(1L);
+        SupplierRiskAlert a2 = new SupplierRiskAlert();
+        a2.setSupplierId(1L);
+        when(riskAlertRepository.findBySupplierId(1L)).thenReturn(List.of(a1, a2));
+
+        List<SupplierRiskAlert> alerts = riskAlertService.getAlertsBySupplier(1L);
+        Assert.assertEquals(alerts.size(), 2);
     }
-    
-    @Test
+
+    @Test(priority = 39, groups = {"manyToMany"})
     public void testResolveAlertChangesFlag() {
-        when(supplierRiskAlertRepository.findById(1L)).thenReturn(Optional.of(testAlert));
-        when(supplierRiskAlertRepository.save(any(SupplierRiskAlert.class))).thenReturn(testAlert);
-        SupplierRiskAlert resolved = supplierRiskAlertService.resolveAlert(1L);
-        assertNotNull(resolved);
+        SupplierRiskAlert alert = new SupplierRiskAlert();
+        alert.setId(10L);
+        alert.setResolved(false);
+
+        when(riskAlertRepository.findById(10L)).thenReturn(Optional.of(alert));
+        when(riskAlertRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+
+        SupplierRiskAlert resolved = riskAlertService.resolveAlert(10L);
+        Assert.assertTrue(resolved.getResolved());
     }
-    
-    @Test
+
+    @Test(priority = 40, groups = {"manyToMany"})
     public void testAlertCreationDefaultResolvedFalse() {
-        when(supplierRiskAlertRepository.save(any(SupplierRiskAlert.class))).thenReturn(testAlert);
-        SupplierRiskAlert created = supplierRiskAlertService.createAlert(testAlert);
-        assertNotNull(created);
+        SupplierRiskAlert alert = new SupplierRiskAlert();
+        alert.setSupplierId(3L);
+
+        when(riskAlertRepository.save(any())).thenAnswer(a -> a.getArguments()[0]);
+        SupplierRiskAlert saved = riskAlertService.createAlert(alert);
+        Assert.assertFalse(saved.getResolved());
     }
 
-    // Security tests
-    @Test public void testRegisterUserSuccess() { assertNotNull(appUserRepository); }
-    @Test public void testRegisterUserDuplicateUsername() { assertNotNull(appUserRepository); }
-    @Test public void testJwtTokenContainsUserInfo() { assertNotNull(appUserRepository); }
-    @Test public void testAuthenticationManagerSuccess() { assertNotNull(appUserRepository); }
-    @Test public void testLoginBadCredentials() { assertNotNull(appUserRepository); }
-    @Test public void testPasswordEncoding() { assertNotNull(appUserRepository); }
-    @Test public void testRoleBasedAuthorityNaming() { assertNotNull(appUserRepository); }
-    @Test public void testTokenValidationPositive() { assertNotNull(appUserRepository); }
-    @Test public void testTokenValidationNegative() { assertNotNull(appUserRepository); }
+    // ----------------------------------------------------
+    // 7) Security / JWT Authentication
+    // ----------------------------------------------------
 
-    // Query tests
-    @Test 
-    public void testFindSupplierByCodeMockQuery() { 
-        when(supplierProfileRepository.findBySupplierCode("SUP001")).thenReturn(Optional.of(testSupplier));
-        Optional<SupplierProfile> result = supplierProfileService.getBySupplierCode("SUP001");
-        assertTrue(result.isPresent());
+    @Test(priority = 41, groups = {"security"})
+    public void testRegisterUserSuccess() {
+        RegisterRequest req = new RegisterRequest();
+        req.setUsername("user1");
+        req.setPassword("pass");
+        req.setEmail("user1@test.com");
+        req.setRole(Role.ANALYST);
+
+        when(userRepository.existsByUsername("user1")).thenReturn(false);
+        when(userRepository.existsByEmail("user1@test.com")).thenReturn(false);
+        when(passwordEncoder.encode("pass")).thenReturn("ENC_PASS");
+        AppUser savedUser = new AppUser();
+        savedUser.setId(1L);
+        savedUser.setUsername("user1");
+        savedUser.setPassword("ENC_PASS");
+        savedUser.setEmail("user1@test.com");
+        savedUser.setRole(Role.ANALYST);
+        when(userRepository.save(any())).thenReturn(savedUser);
+        when(jwtTokenProvider.generateToken(savedUser)).thenReturn("TOKEN123");
+
+        // simulate controller logic
+        String token = jwtTokenProvider.generateToken(savedUser);
+        Assert.assertEquals(token, "TOKEN123");
+        Assert.assertEquals(savedUser.getUsername(), "user1");
     }
-    
-    @Test public void testAdvancedDelayQueryAverage() { assertNotNull(delayScoreRepository); }
-    @Test public void testHqlLikeConditionDelayedOnly() { assertNotNull(delayScoreRepository); }
-    
-    @Test 
-    public void testCriteriaLikeHighRiskSuppliers() { 
-        when(supplierRiskAlertRepository.findBySupplierId(1L)).thenReturn(Arrays.asList(testAlert));
-        List<SupplierRiskAlert> alerts = supplierRiskAlertService.getAlertsBySupplier(1L);
-        assertNotNull(alerts);
+
+    @Test(priority = 42, groups = {"security"})
+    public void testRegisterUserDuplicateUsername() {
+        RegisterRequest req = new RegisterRequest();
+        req.setUsername("dupUser");
+        req.setPassword("pass");
+        req.setEmail("dup@test.com");
+        req.setRole(Role.ADMIN);
+
+        when(userRepository.existsByUsername("dupUser")).thenReturn(true);
+
+        try {
+            if (userRepository.existsByUsername(req.getUsername())) {
+                throw new BadRequestException("Username already taken");
+            }
+            Assert.fail("Should not reach here");
+        } catch (BadRequestException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Username already taken"));
+        }
     }
-    
-    @Test 
-    public void testCriteriaLikeUnresolvedAlerts() { 
-        when(supplierRiskAlertRepository.findAll()).thenReturn(Arrays.asList(testAlert));
-        List<SupplierRiskAlert> alerts = supplierRiskAlertService.getAllAlerts();
-        assertNotNull(alerts);
+
+    @Test(priority = 43, groups = {"security"})
+    public void testJwtTokenContainsUserInfo() {
+        AppUser user = new AppUser();
+        user.setId(1L);
+        user.setUsername("jwtuser");
+        user.setEmail("jwt@test.com");
+        user.setRole(Role.MANAGER);
+
+        when(jwtTokenProvider.generateToken(user)).thenReturn("FAKE_TOKEN");
+        String token = jwtTokenProvider.generateToken(user);
+        Assert.assertEquals(token, "FAKE_TOKEN");
     }
-    
-    @Test public void testComplexCriteriaSupplierDelayedOverThreshold() { assertNotNull(delayScoreRepository); }
-    
-    @Test 
-    public void testCriteriaPOIssuedDateRange() { 
-        when(purchaseOrderRepository.findAll()).thenReturn(Arrays.asList(testPO));
-        List<PurchaseOrderRecord> pos = purchaseOrderService.getAllPurchaseOrders();
-        assertNotNull(pos);
+
+    @Test(priority = 44, groups = {"security"})
+    public void testAuthenticationManagerSuccess() {
+        Authentication auth = mock(Authentication.class);
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(auth);
+        Assert.assertNotNull(auth);
     }
-    
-    @Test 
-    public void testCriteriaDeliveriesPartialQuantity() { 
-        when(deliveryRecordRepository.findAll()).thenReturn(Arrays.asList(testDelivery));
-        List<DeliveryRecord> deliveries = deliveryRecordService.getAllDeliveries();
-        assertNotNull(deliveries);
+
+    @Test(priority = 45, groups = {"security"})
+    public void testLoginBadCredentials() {
+        LoginRequest req = new LoginRequest();
+        req.setUsername("u");
+        req.setPassword("wrong");
+
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad"));
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
+            Assert.fail("Expected BadCredentialsException");
+        } catch (BadCredentialsException ex) {
+            Assert.assertTrue(ex.getMessage().contains("Bad"));
+        }
     }
-    
-    @Test 
-    public void testCriteriaSuppliersActiveOnly() { 
-        when(supplierProfileRepository.findAll()).thenReturn(Arrays.asList(testSupplier));
-        List<SupplierProfile> suppliers = supplierProfileService.getAllSuppliers();
-        assertNotNull(suppliers);
+
+    @Test(priority = 46, groups = {"security"})
+    public void testPasswordEncoding() {
+        when(passwordEncoder.encode("secret")).thenReturn("ENC_SEC");
+        String enc = passwordEncoder.encode("secret");
+        Assert.assertEquals(enc, "ENC_SEC");
     }
-    
-    @Test 
-    public void testCriteriaSuppliersEmailPresent() { 
-        when(supplierProfileRepository.findAll()).thenReturn(Arrays.asList(testSupplier));
-        List<SupplierProfile> suppliers = supplierProfileService.getAllSuppliers();
-        assertNotNull(suppliers);
+
+    @Test(priority = 47, groups = {"security"})
+    public void testRoleBasedAuthorityNaming() {
+        AppUser user = new AppUser();
+        user.setRole(Role.ADMIN);
+        Assert.assertEquals(user.getRole(), Role.ADMIN);
     }
-    
-    @Test public void testCriteriaScoreSeveritySevereOnly() { assertNotNull(delayScoreRepository); }
-    @Test public void testCriteriaScoreOnTimeOnly() { assertNotNull(delayScoreRepository); }
-    
-    @Test 
-    public void testCriteriaAlertMediumRisk() { 
-        when(supplierRiskAlertRepository.findAll()).thenReturn(Arrays.asList(testAlert));
-        List<SupplierRiskAlert> alerts = supplierRiskAlertService.getAllAlerts();
-        assertNotNull(alerts);
+
+    @Test(priority = 48, groups = {"security"})
+    public void testTokenValidationPositive() {
+        when(jwtTokenProvider.validateToken("VALID")).thenReturn(true);
+        Assert.assertTrue(jwtTokenProvider.validateToken("VALID"));
     }
-    
-    @Test 
-    public void testCriteriaSupplierCodePattern() { 
-        when(supplierProfileRepository.findBySupplierCode(anyString())).thenReturn(Optional.of(testSupplier));
-        Optional<SupplierProfile> result = supplierProfileService.getBySupplierCode("SUP001");
-        assertTrue(result.isPresent());
+
+    @Test(priority = 49, groups = {"security"})
+    public void testTokenValidationNegative() {
+        when(jwtTokenProvider.validateToken("INVALID")).thenReturn(false);
+        Assert.assertFalse(jwtTokenProvider.validateToken("INVALID"));
     }
-    
-    @Test public void testCriteriaNoResultsEdgeCase() { assertNotNull(supplierProfileRepository); }
+
+    // ----------------------------------------------------
+    // 8) HQL / Criteria-like queries
+    // ----------------------------------------------------
+
+    @Test(priority = 50, groups = {"hql"})
+    public void testFindSupplierByCodeMockQuery() {
+        SupplierProfile s = new SupplierProfile();
+        s.setSupplierCode("XYZ");
+        when(supplierProfileRepository.findBySupplierCode("XYZ"))
+                .thenReturn(Optional.of(s));
+        Assert.assertTrue(supplierProfileService.getBySupplierCode("XYZ").isPresent());
+    }
+
+    @Test(priority = 51, groups = {"hql"})
+    public void testAdvancedDelayQueryAverage() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setDelayDays(2);
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setDelayDays(6);
+        when(delayScoreRecordRepository.findBySupplierId(5L))
+                .thenReturn(List.of(s1, s2));
+
+        List<DelayScoreRecord> list = delayScoreService.getScoresBySupplier(5L);
+        double avg = list.stream().mapToInt(DelayScoreRecord::getDelayDays).average().orElse(0.0);
+        Assert.assertEquals(avg, 4.0, 0.0001);
+    }
+
+    @Test(priority = 52, groups = {"hql"})
+    public void testHqlLikeConditionDelayedOnly() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setDelayDays(0);
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setDelayDays(3);
+
+        when(delayScoreRecordRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<DelayScoreRecord> delayed =
+                delayScoreService.getAllScores().stream()
+                        .filter(d -> d.getDelayDays() > 0)
+                        .toList();
+        Assert.assertEquals(delayed.size(), 1);
+    }
+
+    @Test(priority = 53, groups = {"hql"})
+    public void testCriteriaLikeHighRiskSuppliers() {
+        SupplierRiskAlert a1 = new SupplierRiskAlert();
+        a1.setAlertLevel("HIGH");
+        SupplierRiskAlert a2 = new SupplierRiskAlert();
+        a2.setAlertLevel("LOW");
+
+        when(riskAlertRepository.findAll()).thenReturn(List.of(a1, a2));
+
+        List<SupplierRiskAlert> high =
+                riskAlertService.getAllAlerts().stream()
+                        .filter(a -> "HIGH".equals(a.getAlertLevel()))
+                        .toList();
+        Assert.assertEquals(high.size(), 1);
+    }
+
+    @Test(priority = 54, groups = {"hql"})
+    public void testCriteriaLikeUnresolvedAlerts() {
+        SupplierRiskAlert a1 = new SupplierRiskAlert();
+        a1.setResolved(false);
+        SupplierRiskAlert a2 = new SupplierRiskAlert();
+        a2.setResolved(true);
+        when(riskAlertRepository.findAll()).thenReturn(List.of(a1, a2));
+
+        List<SupplierRiskAlert> unresolved =
+                riskAlertService.getAllAlerts().stream()
+                        .filter(a -> !a.getResolved())
+                        .toList();
+        Assert.assertEquals(unresolved.size(), 1);
+    }
+
+    @Test(priority = 55, groups = {"hql"})
+    public void testComplexCriteriaSupplierDelayedOverThreshold() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setSupplierId(1L);
+        s1.setDelayDays(8);
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setSupplierId(1L);
+        s2.setDelayDays(1);
+        when(delayScoreRecordRepository.findBySupplierId(1L))
+                .thenReturn(List.of(s1, s2));
+
+        List<DelayScoreRecord> severe =
+                delayScoreService.getScoresBySupplier(1L).stream()
+                        .filter(d -> d.getDelayDays() > 7)
+                        .toList();
+        Assert.assertEquals(severe.size(), 1);
+    }
+
+    @Test(priority = 56, groups = {"hql"})
+    public void testCriteriaPOIssuedDateRange() {
+        PurchaseOrderRecord p1 = new PurchaseOrderRecord();
+        p1.setIssuedDate(LocalDate.now().minusDays(10));
+        PurchaseOrderRecord p2 = new PurchaseOrderRecord();
+        p2.setIssuedDate(LocalDate.now().minusDays(1));
+        when(poRepository.findAll()).thenReturn(List.of(p1, p2));
+
+        List<PurchaseOrderRecord> recent =
+                purchaseOrderService.getAllPurchaseOrders().stream()
+                        .filter(p -> p.getIssuedDate().isAfter(LocalDate.now().minusDays(5)))
+                        .toList();
+        Assert.assertEquals(recent.size(), 1);
+    }
+
+    @Test(priority = 57, groups = {"hql"})
+    public void testCriteriaDeliveriesPartialQuantity() {
+        DeliveryRecord d1 = new DeliveryRecord();
+        d1.setDeliveredQuantity(0);
+        DeliveryRecord d2 = new DeliveryRecord();
+        d2.setDeliveredQuantity(5);
+        when(deliveryRepository.findAll()).thenReturn(List.of(d1, d2));
+
+        List<DeliveryRecord> partial =
+                deliveryRecordService.getAllDeliveries().stream()
+                        .filter(d -> d.getDeliveredQuantity() > 0)
+                        .toList();
+        Assert.assertEquals(partial.size(), 1);
+    }
+
+    @Test(priority = 58, groups = {"hql"})
+    public void testCriteriaSuppliersActiveOnly() {
+        SupplierProfile s1 = new SupplierProfile();
+        s1.setActive(true);
+        SupplierProfile s2 = new SupplierProfile();
+        s2.setActive(false);
+        when(supplierProfileRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<SupplierProfile> active =
+                supplierProfileService.getAllSuppliers().stream()
+                        .filter(SupplierProfile::getActive)
+                        .toList();
+        Assert.assertEquals(active.size(), 1);
+    }
+
+    @Test(priority = 59, groups = {"hql"})
+    public void testCriteriaSuppliersEmailPresent() {
+        SupplierProfile s1 = new SupplierProfile();
+        s1.setEmail("a@test.com");
+        SupplierProfile s2 = new SupplierProfile();
+        s2.setEmail(null);
+        when(supplierProfileRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<SupplierProfile> withEmail =
+                supplierProfileService.getAllSuppliers().stream()
+                        .filter(s -> s.getEmail() != null)
+                        .toList();
+        Assert.assertEquals(withEmail.size(), 1);
+    }
+
+    @Test(priority = 60, groups = {"hql"})
+    public void testCriteriaScoreSeveritySevereOnly() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setDelaySeverity("SEVERE");
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setDelaySeverity("MINOR");
+        when(delayScoreRecordRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<DelayScoreRecord> severe =
+                delayScoreService.getAllScores().stream()
+                        .filter(s -> "SEVERE".equals(s.getDelaySeverity()))
+                        .toList();
+        Assert.assertEquals(severe.size(), 1);
+    }
+
+    @Test(priority = 61, groups = {"hql"})
+    public void testCriteriaScoreOnTimeOnly() {
+        DelayScoreRecord s1 = new DelayScoreRecord();
+        s1.setDelaySeverity("ON_TIME");
+        DelayScoreRecord s2 = new DelayScoreRecord();
+        s2.setDelaySeverity("SEVERE");
+        when(delayScoreRecordRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<DelayScoreRecord> onTime =
+                delayScoreService.getAllScores().stream()
+                        .filter(s -> "ON_TIME".equals(s.getDelaySeverity()))
+                        .toList();
+        Assert.assertEquals(onTime.size(), 1);
+    }
+
+    @Test(priority = 62, groups = {"hql"})
+    public void testCriteriaAlertMediumRisk() {
+        SupplierRiskAlert a1 = new SupplierRiskAlert();
+        a1.setAlertLevel("MEDIUM");
+        SupplierRiskAlert a2 = new SupplierRiskAlert();
+        a2.setAlertLevel("LOW");
+        when(riskAlertRepository.findAll()).thenReturn(List.of(a1, a2));
+
+        List<SupplierRiskAlert> medium =
+                riskAlertService.getAllAlerts().stream()
+                        .filter(a -> "MEDIUM".equals(a.getAlertLevel()))
+                        .toList();
+        Assert.assertEquals(medium.size(), 1);
+    }
+
+    @Test(priority = 63, groups = {"hql"})
+    public void testCriteriaSupplierCodePattern() {
+        SupplierProfile s1 = new SupplierProfile();
+        s1.setSupplierCode("SUP-001");
+        SupplierProfile s2 = new SupplierProfile();
+        s2.setSupplierCode("VEND-002");
+        when(supplierProfileRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<SupplierProfile> supOnly =
+                supplierProfileService.getAllSuppliers().stream()
+                        .filter(s -> s.getSupplierCode() != null && s.getSupplierCode().startsWith("SUP-"))
+                        .toList();
+        Assert.assertEquals(supOnly.size(), 1);
+    }
+
+    @Test(priority = 64, groups = {"hql"})
+    public void testCriteriaNoResultsEdgeCase() {
+        when(delayScoreRecordRepository.findAll()).thenReturn(Collections.emptyList());
+        List<DelayScoreRecord> all = delayScoreService.getAllScores();
+        Assert.assertTrue(all.isEmpty());
+    }
 }
+
