@@ -31,12 +31,14 @@ public class DelayScoreServiceImpl implements DelayScoreService {
             DelayScoreRecordRepository delayScoreRepository,
             PurchaseOrderRecordRepository poRepository,
             DeliveryRecordRepository deliveryRepository,
-            SupplierProfileRepository supplierRepository
+            SupplierProfileRepository supplierRepository,
+            SupplierRiskAlertRepository  riskRepository;
     ) {
         this.delayScoreRepository = delayScoreRepository;
         this.poRepository = poRepository;
         this.deliveryRepository = deliveryRepository;
         this.supplierRepository = supplierRepository;
+        this.riskz
     }
 
     @Override
