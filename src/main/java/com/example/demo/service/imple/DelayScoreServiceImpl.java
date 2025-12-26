@@ -25,6 +25,8 @@ public class DelayScoreServiceImpl implements DelayScoreService {
     private final PurchaseOrderRecordRepository poRepository;
     private final DeliveryRecordRepository deliveryRepository;
     private final SupplierProfileRepository supplierRepository;
+    private final SupplierRiskAlertRepository Repository;
+    
 
     @Autowired
     public DelayScoreServiceImpl(
@@ -38,7 +40,7 @@ public class DelayScoreServiceImpl implements DelayScoreService {
         this.poRepository = poRepository;
         this.deliveryRepository = deliveryRepository;
         this.supplierRepository = supplierRepository;
-        this.riskz
+        this.riskRepository = riskRepository;
     }
 
     @Override
