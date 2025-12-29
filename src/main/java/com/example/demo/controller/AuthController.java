@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.JwtResponse;
 import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.RegisterRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,14 +32,18 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticate user and obtain JWT token")
-    public ResponseEntity<String> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<JwtResponse> login(@RequestBody LoginRequest loginRequest) {
         if (loginRequest.getUsername() == null || loginRequest.getUsername().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Username is required");
+            return ResponseEntity.badRequest().build();
         }
         if (loginRequest.getPassword() == null || loginRequest.getPassword().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Password is required");
+            return ResponseEntity.badRequest().build();
         }
         
-        return ResponseEntity.ok("Login successful for user: " + loginRequest.getUsername());
+        // Mock JWT token for demo
+        String mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+        JwtResponse response = new JwtResponse(mockToken, loginRequest.getUsername(), loginRequest.getUsername() + "@example.com");
+        
+        return ResponseEntity.ok(response);
     }
 }
