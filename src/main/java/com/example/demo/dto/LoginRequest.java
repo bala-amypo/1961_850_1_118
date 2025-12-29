@@ -1,13 +1,17 @@
 package com.example.demo.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
+@Schema(description = "User login request")
 public class LoginRequest {
     
-    @NotBlank
+    @JsonProperty("username")
+    @Schema(description = "Username or email", example = "john_doe", required = true)
     private String username;
     
-    @NotBlank
+    @JsonProperty("password")
+    @Schema(description = "User password", example = "password123", required = true)
     private String password;
 
     public LoginRequest() {}

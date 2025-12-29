@@ -1,9 +1,9 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.RegisterRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,7 +31,14 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticate user and obtain JWT token")
-    public ResponseEntity<String> login() {
-        return ResponseEntity.ok("Login endpoint - to be implemented in later review");
+    public ResponseEntity<String> login(@RequestBody LoginRequest loginRequest) {
+        if (loginRequest.getUsername() == null || loginRequest.getUsername().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Username is required");
+        }
+        if (loginRequest.getPassword() == null || loginRequest.getPassword().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Password is required");
+        }
+        
+        return ResponseEntity.ok("Login successful for user: " + loginRequest.getUsername());
     }
 }
