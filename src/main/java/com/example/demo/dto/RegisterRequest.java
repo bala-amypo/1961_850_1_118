@@ -1,29 +1,26 @@
 package com.example.demo.dto;
 
 import com.example.demo.model.Role;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 @Schema(description = "User registration request")
 public class RegisterRequest {
     
-    @NotBlank
-    @Schema(description = "Username for the new account", example = "john_doe")
+    @JsonProperty("username")
+    @Schema(description = "Username for the new account", example = "john_doe", required = true)
     private String username;
     
-    @Email
-    @NotBlank
-    @Schema(description = "Email address for the new account", example = "john@example.com")
+    @JsonProperty("email")
+    @Schema(description = "Email address for the new account", example = "john@example.com", required = true)
     private String email;
     
-    @NotBlank
-    @Size(min = 6)
-    @Schema(description = "Password for the new account (minimum 6 characters)", example = "password123")
+    @JsonProperty("password")
+    @Schema(description = "Password for the new account (minimum 6 characters)", example = "password123", required = true)
     private String password;
     
-    @Schema(description = "User role", example = "USER")
+    @JsonProperty("role")
+    @Schema(description = "User role", example = "ANALYST")
     private Role role;
 
     public RegisterRequest() {}

@@ -14,8 +14,19 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register new user", description = "Register a new user account")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        return ResponseEntity.ok("Registration endpoint - to be implemented in later review");
+    public ResponseEntity<String> register(@RequestBody RegisterRequest registerRequest) {
+        // Basic validation check
+        if (registerRequest.getUsername() == null || registerRequest.getUsername().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Username is required");
+        }
+        if (registerRequest.getEmail() == null || registerRequest.getEmail().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Email is required");
+        }
+        if (registerRequest.getPassword() == null || registerRequest.getPassword().length() < 6) {
+            return ResponseEntity.badRequest().body("Password must be at least 6 characters");
+        }
+        
+        return ResponseEntity.ok("Registration successful for user: " + registerRequest.getUsername());
     }
 
     @PostMapping("/login")
